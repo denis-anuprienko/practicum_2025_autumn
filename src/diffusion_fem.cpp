@@ -38,19 +38,19 @@ private:
 	/// Mesh
 	Mesh &m;
 	// =========== Tags =============
-	/// Тег с решением (концентрацией) на узлах сетки
+	/// Solution (concentration) tag defined on nodes
 	Tag tagConc;
-	/// Тег тензора диффузии: 3 числа (Dx, Dy, Dxy) на каждую ячейку
+	/// Diffusion tensor tag (3 numbers per cell = triangle)
 	Tag tagD;
-	/// Тег граничного условия (boundary condition): 1 число на узел, тег является разреженным (sparse) на узлах, т.к. не все они граничные
+	/// Boundary condition tag (1 real number per node)
 	Tag tagBCval;
-	/// Тег источника (правой части в уравнении): 1 число на узел
+	/// Source tag (1 real number per node)
 	Tag tagSource;
-	/// Тег аналитического решения: 1 число на узел
+	/// Analytical solution tag (1 real number per node)
 	Tag tagConcAn;
-	/// Тег индекса в глобальной системе уравнений: 1 целое число на узел
+	/// Global index tag (1 integer number per node)
 	Tag tagGlobInd;
-	/// Тег ошибки решения: 1 число на узел
+	/// Numerical error in concentration (1 real number per node)
 	Tag tagConcErr;
 
 	// =========== Tag names ===========
@@ -64,45 +64,45 @@ private:
 	const string tagNameConcErr = "Error";
 
 	// =========== Markers
-	/// Специальный маркер (метка), которым обозначаются узлы с ГУ Дирихле
+	/// Marker for Dirichlet nodes
 	MarkerType mrkDirNode;
-	/// Число узлов Дирихле. Общее число неизвестных = число узлов в сетке минус numDirNodes
+	/// Number of Dir. nodes. Total number of unknowns = number of nodes - numDirNodes
 	unsigned numDirNodes;
 public:
 	Problem(Mesh &m_);
 	~Problem();
 
-	// Инициализация: создание тегов, разметка узлов Дирихле
+	// Creation of tags, markup of Dirichlet nodes
 	void initProblem();
 
-	// Сборка глобальной линейной системы
+	// Assembly of the global linear system
 	void assembleGlobalSystem(Sparse::Matrix &A, Sparse::Vector &rhs);
 
-	// Сборка локальной матрицы жесткости и локального вектора правой части
+	// Assembly of local system of size 3x3
 	void assembleLocalSystem(const Cell &c, rMatrix &A_loc, rMatrix &rhs_loc);
 
-	// Общий процесс решения задачи
+	// Solution process
 	void run();
 
-	// Базисная функция в МКЭ
+	// Basis piecewise-linear function
 	double basis_func(const Cell& c, const Node& n, double x_, double y_);
 
-	// Градиент базисной функции
+	// Its gradient (= const on cell, so no (x,y))
 	rMatrix basis_func_grad(const Cell& c, const Node& n);
 
-	// Преобразование барицентрических координат в обычные
+	// Transform barycentric coordinates to (x,y)
 	void coords_from_barycentric(double* node_x, double* node_y, double* eta, double* x, double* y);
 
-	// Вычисление аппроксимации функции, заданной в теге, базисными функциями-домиками 
+	// Approximate in a cell a function defined by its nodal values in tag T  
 	double approximate(const Cell& c, const Tag& T, double x, double y);
 
-	// Интегрирование функции, заданной узловыми значениями в теге, по треугольной ячейке
+	// Integrate a function defined by its nodal values in tag T
 	double integrate_over_triangle(const Cell& c, const Tag& T);
 
-	// Вычисление C-нормы
+	// Get error C-norm
     double get_err_c_norm();
 
-	// Вычисление L2-нормы
+	// Get error L2-norm
     double get_err_L2_norm();
 };
 
@@ -118,17 +118,17 @@ Problem::~Problem()
 void Problem::initProblem()
 {
 	// Init tags
-	tagConc    = m.CreateTag(tagNameConc,    DATA_REAL,    NODE, NONE, 1); // 1 число на узел
-	tagD       = m.CreateTag(tagNameD,       DATA_REAL,    CELL, NONE, 3); // 3 числа на ячейку
-	tagBCval   = m.CreateTag(tagNameBCval,   DATA_REAL,    NODE, NODE, 1); // 1 число на узел, разрежен на узлах
-	tagSource  = m.CreateTag(tagNameSource,  DATA_REAL,    NODE, NONE, 1); // 1 число на узел
-	tagConcAn  = m.CreateTag(tagNameConcAn,  DATA_REAL,    NODE, NONE, 1); // 1 число на узел
-	tagGlobInd = m.CreateTag(tagNameGlobInd, DATA_INTEGER, NODE, NONE, 1); // 1 целое число на узел
-	tagConcErr = m.CreateTag(tagNameConcErr, DATA_REAL,    NODE, NONE, 1); // 1 число на узел
+	tagConc    = m.CreateTag(tagNameConc,    DATA_REAL,    NODE, NONE, 1); // 1 real number per node
+	tagD       = m.CreateTag(tagNameD,       DATA_REAL,    CELL, NONE, 3); // 3 real numbers per cell
+	tagBCval   = m.CreateTag(tagNameBCval,   DATA_REAL,    NODE, NODE, 1); // 1 real number per node, sparse on nodes
+	tagSource  = m.CreateTag(tagNameSource,  DATA_REAL,    NODE, NONE, 1); // 1 real number per node
+	tagConcAn  = m.CreateTag(tagNameConcAn,  DATA_REAL,    NODE, NONE, 1); // 1 real number per node
+	tagGlobInd = m.CreateTag(tagNameGlobInd, DATA_INTEGER, NODE, NONE, 1); // 1 integer number per node
+	tagConcErr = m.CreateTag(tagNameConcErr, DATA_REAL,    NODE, NONE, 1); // 1 real number per node
 
 	// Cell loop
-	// 1. Проверяем, что ячейка - треугольник
-	// 2. Записываем тензор 
+	// 1. Check that all cells are triangles
+	// 2. Fill tensor
 	for(Mesh::iteratorCell icell = m.BeginCell(); icell != m.EndCell(); icell++){
 		Cell c = icell->getAsCell();
 		ElementArray<Node> nodes = c.getNodes();
@@ -143,9 +143,9 @@ void Problem::initProblem()
 	}
 
 	// Node loop
-	// 1. Записываем значения источника и аналитики
-	// 2. Проверка на граничный узел, запись ГУ
-	// 3. Присвоение индекса в глобальной системе
+	// 1. Set source and analytics
+	// 2. Check boundary, set marker and BC tag
+	// 3. Set global indices
 	mrkDirNode = m.CreateMarker();
 	numDirNodes = 0;
 	int glob_ind = 0;
@@ -170,8 +170,8 @@ void Problem::initProblem()
 	printf("Number of Dirichlet nodes: %d\n", numDirNodes);
 }
 
-// Базисная конечноэлементая функция-домик, точнее, ее кусок на отдельной взятой ячейке
-// Поскольку на треугольнике определены 3 таких функции, нужно еще указать узел, которому она соответствует
+// Piecewise linear "pyramid" basis function, more precisely, its restricition to 1 triangle
+// Since a triangle has 3 such function, a node is passed to determine specific function
 double Problem::basis_func(const Cell &c, const Node &n, double x_, double y_)
 {
     ElementArray<Node> nodes = c.getNodes();
@@ -203,9 +203,9 @@ double Problem::basis_func(const Cell &c, const Node &n, double x_, double y_)
 	}
 }
 
-// Градиент базисной функции
-// Поскольку это вектор, решение возвращается в виде инмостовского типа данных rMatrix (матрица действительных чисел)
-// Так как базисные функции линейны, градиент фактически является константой
+// Gradient of the basis_func
+// Since it's a vector, it's returned as INMOST::rMatrix (matrix of reals)
+// Is constant in a cell
 rMatrix Problem::basis_func_grad(const Cell &c, const Node &n)
 {
     ElementArray<Node> nodes = c.getNodes();
@@ -241,14 +241,16 @@ rMatrix Problem::basis_func_grad(const Cell &c, const Node &n)
 	return grad;
 }
 
-// Преобразование барицентрических координат в обычные
+// Barycentric coordinates to normal ones
+// For more info see page 39 in https://www.inm.ras.ru/wp-content/uploads/library/Monographies/yuv-kapyrin-svt-prak.pdf
 void Problem::coords_from_barycentric(double* node_x, double* node_y, double* eta, double* x, double* y)
 {
 	*x = node_x[0] * eta[0] + node_x[1] * eta[1] + node_x[2] * eta[2];
 	*y = node_y[0] * eta[0] + node_y[1] * eta[1] + node_y[2] * eta[2];
 }
 
-// Вычисление аппроксимации функции, заданной в теге, базисными функциями-домиками 
+// Approximation by a linear combination of basis functions
+// Coefficients are given by the nodal values of tag T
 double Problem::approximate(const Cell &c, const Tag &T, double x, double y)
 {
     ElementArray<Node> nodes = c.getNodes();
@@ -261,7 +263,10 @@ double Problem::approximate(const Cell &c, const Tag &T, double x, double y)
     return pow(C(x, y) - res, 2);
 }
 
-// Интегрирование функции, заданной узловыми значениями в теге, по треугольной ячейке
+// Integration of a function over triangle
+// The function is defined by its nodal values in tag T
+// Problem::approximate is used to find values outside of nodes
+// See pages 38-40 in https://www.inm.ras.ru/wp-content/uploads/library/Monographies/yuv-kapyrin-svt-prak.pdf
 double Problem::integrate_over_triangle(const Cell &c, const Tag &T)
 {
     double res = 0.0;
@@ -391,13 +396,12 @@ void Problem::assembleGlobalSystem(Sparse::Matrix &A, Sparse::Vector &rhs)
 		ElementArray<Node> nodes = c.getNodes();
 		unsigned glob_ind[3] = {0,0,0};
 		for(unsigned loc_ind = 0; loc_ind < 3; loc_ind++){
-            // Как найти глобальный индекс?
+            // How to find global index?
             //glob_ind[loc_ind] = ???;
 		}
 		
 		for(unsigned loc_ind = 0; loc_ind < 3; loc_ind++){
-			// Взять узел с локальным индексом и ДОБАВИТЬ соответствующий элемент
-			// локальной матрицы в глобальную
+			// For node 'loc_ind' ADD (so use +=) its element in A_loc to the corresponding place in A
 			
 			// Check if this is a Dirichlet node
 			if(nodes[loc_ind].GetMarker(mrkDirNode))
@@ -411,7 +415,7 @@ void Problem::assembleGlobalSystem(Sparse::Matrix &A, Sparse::Vector &rhs)
 					;//
 				
 			}
-			// А здесь добавить локальный вклад вектора в глобальный
+			// Don't forget the RHS
 		}
 	}
 }
@@ -475,7 +479,7 @@ void Problem::run()
 		}
 		unsigned ind = static_cast<unsigned>(n.Integer(tagGlobInd));
 		n.Real(tagConc) = sol[ind];
-		// Добавить запись тега ошикбки
+		// Implement yourself: setting error tag
 	}
 	m.Save("res.vtk");
 }
